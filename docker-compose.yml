@@ -1,0 +1,93 @@
+version: "3.8"
+
+services:
+  # --- Infrastructure ---
+  zookeeper:
+    image: zookeeper:3.5
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - sofastack-net
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - sofastack-net
+
+  # --- Datadog Agent ---
+  datadog-agent:
+    image: registry.datadoghq.com/agent:latest
+    container_name: datadog-agent
+    environment:
+      - DD_API_KEY=${DD_API_KEY:?Please set DD_API_KEY}
+      - DD_SITE=${DD_SITE:-datadoghq.com}
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_ENABLED=true
+      - DD_PROCESS_AGENT_ENABLED=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+    ports:
+      - "8126:8126"
+    networks:
+      - sofastack-net
+
+  # --- SOFAStack Applications ---
+  rpcserver:
+    build:
+      context: ./rpcserver
+    container_name: sofa-rpcserver
+    depends_on:
+      - zookeeper
+      - datadog-agent
+    environment:
+      # Datadog unified service tagging
+      - DD_SERVICE=sofa-rpcserver
+      - DD_ENV=dev
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_LOGS_INJECTION=true
+      - DD_TRACE_SAMPLE_RATE=1
+      - DD_PROFILING_ENABLED=true
+    labels:
+      com.datadoghq.tags.service: "sofa-rpcserver"
+      com.datadoghq.tags.env: "dev"
+      com.datadoghq.tags.version: "1.0.0"
+    networks:
+      - sofastack-net
+
+  rpcclient:
+    build:
+      context: ./rpcclient
+    container_name: sofa-rpcclient
+    depends_on:
+      - zookeeper
+      - rpcserver
+      - datadog-agent
+    ports:
+      - "8080:8080"
+    environment:
+      # Datadog unified service tagging
+      - DD_SERVICE=sofa-rpcclient
+      - DD_ENV=dev
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_LOGS_INJECTION=true
+      - DD_TRACE_SAMPLE_RATE=1
+      - DD_PROFILING_ENABLED=true
+    labels:
+      com.datadoghq.tags.service: "sofa-rpcclient"
+      com.datadoghq.tags.env: "dev"
+      com.datadoghq.tags.version: "1.0.0"
+    networks:
+      - sofastack-net
+
+networks:
+  sofastack-net:
+    driver: bridge
