@@ -1,5 +1,5 @@
 ## Stage 1: Build
-FROM maven:3.6-jdk-8 AS build
+FROM maven:3.9-eclipse-temurin-8 AS build
 WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn package -DskipTests -B
 
 ## Stage 2: Runtime
-FROM openjdk:8-jre-slim
+FROM eclipse-temurin:8-jre-jammy
 WORKDIR /app
 
 # Install Datadog Java agent
